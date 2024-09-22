@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from vuln_scripts import vuln_scripts
 from colorama import Fore, Style
 from ipaddress import ip_network
 from psutil import net_if_addrs
@@ -14,21 +15,6 @@ print(f'''
 │                                               │
 └───────────────────────────────────────────────┘
 ''')
-
-vuln_scripts = {
-    21: ['ftp-vsftpd-backdoor', 'ftp-anon', 'ftp-libopie', 'ftp-proftpd-backdoor', 'ftp-vuln-cve2010-4221'],
-    22: ['sshv1', 'ssh2-enum-algos'],
-    23: ['telnet-encryption', 'telnet-brute'],
-    25: ['smtp-vuln-cve2010-4344', 'smtp-vuln-cve2020-28017', 'smtp-open-relay'],
-    53: ['dns-recursion', 'dns-zone-transfer', 'dns-nsid', 'dns-cache-snoop'],
-    80: ['http-sql-injection', 'http-vuln-cve2017-5638', 'http-csrf', 'http-shellshock', 'http-vuln-cve2013-7091'],
-    443: ['ssl-heartbleed', 'http-sql-injection', 'http-vuln-cve2017-5638', 'http-csrf', 'http-shellshock', 'http-vuln-cve2013-7091'],
-    445: ['smb-vuln-ms17-010', 'smb-vuln-ms08-067', 'smb-enum-shares', 'smb-enum-users', 'smb-vuln-cve-2017-7494'],
-    3306: ['mysql-vuln-cve2012-2122', 'mysql-empty-password', 'mysql-brute'],
-    3389: ['rdp-vuln-ms12-020', 'rdp-enum-encryption'],
-    161: ['snmp-brute', 'snmp-info', 'snmp-sysdescr'],
-    'general': ['vulners', 'vuln']
-}
 
 def get_local_ip_and_subnet():
 	local_ip, subnet_mask = None, None
