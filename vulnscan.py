@@ -15,7 +15,6 @@ print(f'''
 └───────────────────────────────────────────────┘
 ''')
 
-# Mapa de scripts específicos por puerto
 vuln_scripts = {
     21: ['ftp-vsftpd-backdoor', 'ftp-anon', 'ftp-libopie', 'ftp-proftpd-backdoor', 'ftp-vuln-cve2010-4221'],
     22: ['sshv1', 'ssh2-enum-algos'],
@@ -28,7 +27,7 @@ vuln_scripts = {
     3306: ['mysql-vuln-cve2012-2122', 'mysql-empty-password', 'mysql-brute'],
     3389: ['rdp-vuln-ms12-020', 'rdp-enum-encryption'],
     161: ['snmp-brute', 'snmp-info', 'snmp-sysdescr'],
-    'general': ['vulners', 'vuln']  # Añadimos ambos scripts generales aquí
+    'general': ['vulners', 'vuln']
 }
 
 def get_local_ip_and_subnet():
@@ -44,10 +43,8 @@ def get_local_ip_and_subnet():
 
 def scan_vulnerabilities(ip, port):
     nm = PortScanner()
-    scripts = vuln_scripts.get(port, vuln_scripts.get('general', []))  # Añadir general si no hay específico
+    scripts = vuln_scripts.get(port, vuln_scripts.get('general', []))
     vuln_results = []
-    
-    # Ejecutar los scripts específicos y generales
     for script in scripts:
         print(f'{Fore.YELLOW}[VULN SCAN]{Style.RESET_ALL} Executing script {script} on IP {ip} Port {port}')
         vuln_scan = nm.scan(ip, str(port), arguments=f'--script {script}')
@@ -55,18 +52,15 @@ def scan_vulnerabilities(ip, port):
             vuln_results.append(f'{Fore.RED}[VULNERABILITY]{Style.RESET_ALL} Vulnerability found on port {port}: {vuln_scan["vulns"]}')
         else:
             vuln_results.append(f'{Fore.GREEN}[NO VULN]{Style.RESET_ALL} No vulnerabilities found on port {port} using script {script}')
-    
     return vuln_results
 
 def nmap_syn_scan(ip, port_range):
     print(f'{Fore.CYAN}[SCAN]{Style.RESET_ALL} Running SYN scan on IP: {ip} for ports: {port_range[0]}-{port_range[1]}')
     nm = PortScanner()
     nm.scan(ip, f'{port_range[0]}-{port_range[1]}', arguments='-sS -O --min-rtt-timeout 200ms --max-rtt-timeout 1000ms --max-retries 1 --min-rate 100')
-    
     for host in nm.all_hosts():
         print(f'{Fore.MAGENTA}[HOST]{Style.RESET_ALL} Host: {host} ({nm[host].hostname()})')
         print(f'{Fore.MAGENTA}[STATUS]{Style.RESET_ALL} Current state: {nm[host].state()}')
-        
         for proto in nm[host].all_protocols():
             lport = nm[host][proto].keys()
             with ThreadPoolExecutor(max_workers=10) as vuln_executor:
@@ -75,10 +69,7 @@ def nmap_syn_scan(ip, port_range):
                     service = nm[host][proto][port]
                     state_color = Fore.GREEN if service["state"] == "open" else (Fore.RED if service["state"] == "closed" else Fore.YELLOW)
                     print(f'{Fore.BLUE}[PORT DETECTED]{Style.RESET_ALL} Port: {Fore.YELLOW}{port}{Style.RESET_ALL} | State: {state_color}{service["state"]}{Style.RESET_ALL} | Service: {Fore.CYAN}{service["name"]}{Style.RESET_ALL}')
-                    
-                    # Ejecutar vulnerabilidades específicas y generales
                     vuln_futures.append(vuln_executor.submit(scan_vulnerabilities, ip, port))
-                
                 for future in as_completed(vuln_futures):
                     vuln_result = future.result()
                     for result in vuln_result:
