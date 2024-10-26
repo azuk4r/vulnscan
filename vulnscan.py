@@ -5,7 +5,7 @@ from ipaddress import ip_network
 from psutil import net_if_addrs
 from nmap import PortScanner
 from socket import AF_INET
-from os import system
+import argparse
 
 init(autoreset=True)
 print(f'''
@@ -46,7 +46,7 @@ def scan_vulnerabilities(ip, port, script):
 def nmap_syn_scan(ip, port_range):
 	print(f'{Fore.CYAN}[SCAN]{Style.RESET_ALL} Running SYN scan on IP: {ip} for ports: {port_range[0]}-{port_range[1]}')
 	nm = PortScanner()
-	nm.scan(ip, f'{port_range[0]}-{port_range[1]}', arguments='-sS -O --min-rtt-timeout 200ms --max-rtt-timeout 1000ms --max-retries 1 --min-rate 100')
+	nm.scan(ip, f'{port_range[0]}-{port_range[1]}', arguments='-sS -O --min-rtt-timeout 200ms --max-rtt-timeout 1000ms --max-retries 1 --min-rate 100 -Pn')
 	for host in nm.all_hosts():
 		print(f'{Fore.MAGENTA}[HOST]{Style.RESET_ALL} Host: {host} ({nm[host].hostname()})')
 		print(f'{Fore.MAGENTA}[STATUS]{Style.RESET_ALL} Current state: {nm[host].state()}')
@@ -72,37 +72,38 @@ def nmap_syn_scan(ip, port_range):
 			for osclass in nm[host]['osclass']:
 				print(f'{Fore.MAGENTA}[OS]{Style.RESET_ALL} OS: {osclass["osfamily"]} {osclass["osgen"]} - Accuracy: {osclass["accuracy"]}')
 
-def ping_ip(ip):
-	response = system(f'ping -n 1 -w 1000 {ip} > nul')
-	return ip if response == 0 else None
-
 def scan_active_ips(network):
 	print(f'{Fore.CYAN}[NETWORK SCAN]{Style.RESET_ALL} Scanning active IPs in network: {network}')
-	active_ips = []
-	with ThreadPoolExecutor(max_workers=10) as executor:
-		results = executor.map(ping_ip, network.hosts())
-		for ip in results:
-			if ip:
-				active_ips.append(str(ip))
+	nm = PortScanner()
+	scan_result = nm.scan(hosts=str(network), arguments='-sn')
+	active_ips = [host for host in scan_result['scan'] if scan_result['scan'][host]['status']['state'] == 'up']
 	return active_ips
 
 def main():
-	local_ip, subnet_mask = get_local_ip_and_subnet()
-	if not local_ip or not subnet_mask:
-		print(f'{Fore.RED}[ERROR]{Style.RESET_ALL} Unable to determine local IP and subnet mask.')
-		return
-	network = ip_network(f'{local_ip}/{subnet_mask}', strict=False)
-	print(f'{Fore.CYAN}[LOCAL IP]{Style.RESET_ALL} Local IP: {local_ip}')
-	print(f'{Fore.CYAN}[SUBNET MASK]{Style.RESET_ALL} Subnet Mask: {subnet_mask}')
-	print(f'{Fore.CYAN}[SCAN]{Style.RESET_ALL} Scanning network: {network}')
-	active_ips = scan_active_ips(network)
-	if not active_ips:
-		print(f'{Fore.YELLOW}[INFO]{Style.RESET_ALL} No active IPs found in the network.')
-		return
-	print(f'{Fore.CYAN}[ACTIVE IPS]{Style.RESET_ALL} Active IPs found: {", ".join(active_ips)}')
-	port_range = (1, 65535)
-	with ThreadPoolExecutor(max_workers=3) as executor:
-		executor.map(lambda ip: nmap_syn_scan(ip, port_range), active_ips)
+	parser = argparse.ArgumentParser(description='Vulnerability Scanner')
+	parser.add_argument('-t', '--target', type=str, help='Target specific IP to scan')
+	args = parser.parse_args()
+
+	if args.target:
+		print(f'{Fore.CYAN}[TARGET MODE]{Style.RESET_ALL} Scanning target IP: {args.target}')
+		nmap_syn_scan(args.target, (1, 65535))
+	else:
+		local_ip, subnet_mask = get_local_ip_and_subnet()
+		if not local_ip or not subnet_mask:
+			print(f'{Fore.RED}[ERROR]{Style.RESET_ALL} Unable to determine local IP and subnet mask.')
+			return
+		network = ip_network(f'{local_ip}/{subnet_mask}', strict=False)
+		print(f'{Fore.CYAN}[LOCAL IP]{Style.RESET_ALL} Local IP: {local_ip}')
+		print(f'{Fore.CYAN}[SUBNET MASK]{Style.RESET_ALL} Subnet Mask: {subnet_mask}')
+		print(f'{Fore.CYAN}[SCAN]{Style.RESET_ALL} Scanning network: {network}')
+		active_ips = scan_active_ips(network)
+		if not active_ips:
+			print(f'{Fore.YELLOW}[INFO]{Style.RESET_ALL} No active IPs found in the network.')
+			return
+		print(f'{Fore.CYAN}[ACTIVE IPS]{Style.RESET_ALL} Active IPs found: {", ".join(active_ips)}')
+		port_range = (1, 65535)
+		with ThreadPoolExecutor(max_workers=3) as executor:
+			executor.map(lambda ip: nmap_syn_scan(ip, port_range), active_ips)
 
 if __name__ == '__main__':
 	main()
